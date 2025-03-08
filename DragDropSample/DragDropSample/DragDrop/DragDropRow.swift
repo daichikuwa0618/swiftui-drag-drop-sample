@@ -82,17 +82,23 @@ struct DragDropRow: View {
         
         AnyLayout(FlowLayout()) {
           ForEach(bottomWords) { word in
-            DragDropButton(title: word.title)
-              .opacity(draggingItemID == word.id ? 0.3 : 1)
-              .onDrag {
-                draggingSource = .bottom
-                return NSItemProvider(object: word.id.uuidString as NSString)
-              } preview: {
-                DragDropButton(title: word.title)
-                  .onAppear {
-                    draggingItemID = word.id
-                  }
-              }
+            if topWords.contains(where: { $0.id == word.id }) {
+              DragDropButton(title: word.title)
+                .opacity(0.4)
+                .background(Color.blue.opacity(0.1))
+            } else {
+              DragDropButton(title: word.title)
+                .opacity(draggingItemID == word.id ? 0.3 : 1)
+                .onDrag {
+                  draggingSource = .bottom
+                  return NSItemProvider(object: word.id.uuidString as NSString)
+                } preview: {
+                  DragDropButton(title: word.title)
+                    .onAppear {
+                      draggingItemID = word.id
+                    }
+                }
+            }
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -100,6 +106,7 @@ struct DragDropRow: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
         .animation(.default, value: bottomWords)
+        .animation(.default, value: topWords)
       }
     }
     .padding()
@@ -149,8 +156,6 @@ struct TopFlowDropDelegate: DropDelegate {
                         toOffset: toIndex > lastIndex ? toIndex : toIndex)
           }
           self.draggingSource = .top
-
-          bottomWords.remove(at: draggedItemIndex)
         }
       }
     }
@@ -182,7 +187,6 @@ struct TopFlowBackgroundDelegate: DropDelegate {
       if !topWords.contains(where: { $0.id == draggedItem.id }) {
         topWords.append(draggedItem)
         draggingSource = .top
-        bottomWords.remove(at: draggedItemIndex)
       }
     }
   }
@@ -208,7 +212,7 @@ struct BackgroundDropDelegate: DropDelegate {
 
   func performDrop(info: DropInfo) -> Bool {
     draggingItemID = nil
-    draggingSource = .none
+    draggingSource = nil
     return true
   }
 }
