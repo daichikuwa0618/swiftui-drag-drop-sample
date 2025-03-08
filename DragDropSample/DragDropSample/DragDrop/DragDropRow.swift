@@ -7,66 +7,158 @@
 
 import SwiftUI
 
+let initialWords = [
+  Word(title: "です"),
+  Word(title: "名前"),
+  Word(title: "私"),
+  Word(title: "は"),
+  Word(title: "の"),
+  Word(title: "山田太郎")
+]
 struct DragDropRow: View {
-  @State private var words: [Word] = [
-    Word(title: "です"),
-    Word(title: "名前"),
-    Word(title: "私"),
-    Word(title: "は"),
-    Word(title: "の"),
-    Word(title: "山田太郎")
-  ]
+  @State private var topWords: [Word] = []
+  @State private var bottomWords: [Word] = initialWords
   @State private var draggingItemID: UUID?
+  @State private var draggingSource: DraggingSource?
 
   var body: some View {
-    AnyLayout(FlowLayout()) {
-      ForEach(words, id: \.id) { word in
-        DragDropButton(title: word.title)
-          .opacity(draggingItemID == word.id ? 0.3 : 1)
-          .onDrag {
-            NSItemProvider(object: word.id.uuidString as NSString)
-          } preview: {
+    VStack(spacing: 20) {
+      Button("Reset") {
+        topWords = []
+        bottomWords = initialWords
+      }
+
+      VStack(alignment: .leading) {
+        Text("Selected - can Drag & Drop")
+          .font(.caption)
+          .foregroundColor(.gray)
+
+        AnyLayout(FlowLayout()) {
+          ForEach(topWords) { word in
             DragDropButton(title: word.title)
-              .onAppear {
-                draggingItemID = word.id
+              .opacity(draggingItemID == word.id ? 0.3 : 1)
+              .onDrag {
+                draggingSource = .top
+                return NSItemProvider(object: word.id.uuidString as NSString)
+              } preview: {
+                DragDropButton(title: word.title)
+                  .onAppear {
+                    draggingItemID = word.id
+                  }
+              }
+              .onDrop(
+                of: [.text],
+                delegate: TopFlowDropDelegate(
+                  word: word,
+                  topWords: $topWords,
+                  bottomWords: $bottomWords,
+                  draggingItemID: $draggingItemID,
+                  draggingSource: $draggingSource
+                )
+              )
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background {
+          Color.gray.opacity(0.1)
+            .contentShape(Rectangle())
+            .onDrop(of: [.text], delegate: TopFlowBackgroundDelegate(
+              topWords: $topWords,
+              bottomWords: $bottomWords,
+              draggingItemID: $draggingItemID,
+              draggingSource: $draggingSource
+            ))
+        }
+        .cornerRadius(8)
+        .animation(.default, value: topWords)
+        .frame(minHeight: 120)
+      }
+
+      VStack(alignment: .leading) {
+        Text("Initial - can't Drag & Drop")
+          .font(.caption)
+          .foregroundColor(.gray)
+        
+        AnyLayout(FlowLayout()) {
+          ForEach(bottomWords) { word in
+            DragDropButton(title: word.title)
+              .opacity(draggingItemID == word.id ? 0.3 : 1)
+              .onDrag {
+                draggingSource = .bottom
+                return NSItemProvider(object: word.id.uuidString as NSString)
+              } preview: {
+                DragDropButton(title: word.title)
+                  .onAppear {
+                    draggingItemID = word.id
+                  }
               }
           }
-          .onDrop(
-            of: [.text],
-            delegate: MyDropDelegate(
-              word: word,
-              words: $words,
-              draggingItemID: $draggingItemID
-            )
-          )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+        .animation(.default, value: bottomWords)
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
     .padding()
-    .animation(.default, value: words)
-    // DragDropButton の外側で Drop されたときに選択状態を解除するために、親 View にも DropDelegate を仕込んでいる
-    // contentShape が無いと Drop 判定が効かないので必要
     .contentShape(Rectangle())
-    .onDrop(of: [.text], delegate: DropOutsideDelegate(draggingItemID: $draggingItemID))
+    .onDrop(of: [.text], delegate: BackgroundDropDelegate(
+      draggingItemID: $draggingItemID, 
+      draggingSource: $draggingSource
+    ))
   }
 }
 
-struct MyDropDelegate: DropDelegate {
+enum DraggingSource {
+  case top
+  case bottom
+}
+
+struct TopFlowDropDelegate: DropDelegate {
   let word: Word
-  @Binding var words: [Word]
+  @Binding var topWords: [Word]
+  @Binding var bottomWords: [Word]
   @Binding var draggingItemID: UUID?
+  @Binding var draggingSource: DraggingSource?
 
   func dropEntered(info: DropInfo) {
-    guard let draggedItemID = draggingItemID else { return }
-    if draggedItemID != word.id {
-      let from = words.firstIndex { $0.id == draggedItemID }!
-      let to = words.firstIndex { $0.id == word.id }!
-      words.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+    guard let draggingItemID, let draggingSource else { return }
+
+    switch draggingSource {
+    case .top:
+      if draggingItemID != word.id {
+        if let fromIndex = topWords.firstIndex(where: { $0.id == draggingItemID }),
+           let toIndex = topWords.firstIndex(where: { $0.id == word.id }) {
+          topWords.move(fromOffsets: IndexSet(integer: fromIndex),
+                      toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        }
+      }
+
+    case .bottom:
+      if let draggedItemIndex = bottomWords.firstIndex(where: { $0.id == draggingItemID }) {
+        let draggedItem = bottomWords[draggedItemIndex]
+        
+        if !topWords.contains(where: { $0.id == draggedItem.id }) {
+          topWords.append(draggedItem)
+
+          if let toIndex = topWords.firstIndex(where: { $0.id == word.id }),
+             let lastIndex = topWords.count > 0 ? topWords.count - 1 : nil {
+            topWords.move(fromOffsets: IndexSet(integer: lastIndex),
+                        toOffset: toIndex > lastIndex ? toIndex : toIndex)
+          }
+          self.draggingSource = .top
+
+          bottomWords.remove(at: draggedItemIndex)
+        }
+      }
     }
   }
 
   func performDrop(info: DropInfo) -> Bool {
     draggingItemID = nil
+    draggingSource = nil
     return true
   }
 
@@ -75,8 +167,25 @@ struct MyDropDelegate: DropDelegate {
   }
 }
 
-struct DropOutsideDelegate: DropDelegate {
+struct TopFlowBackgroundDelegate: DropDelegate {
+  @Binding var topWords: [Word]
+  @Binding var bottomWords: [Word]
   @Binding var draggingItemID: UUID?
+  @Binding var draggingSource: DraggingSource?
+
+  func dropEntered(info: DropInfo) {
+    if draggingSource == .bottom,
+       let draggedItemID = draggingItemID,
+       let draggedItemIndex = bottomWords.firstIndex(where: { $0.id == draggedItemID }) {
+      let draggedItem = bottomWords[draggedItemIndex]
+      
+      if !topWords.contains(where: { $0.id == draggedItem.id }) {
+        topWords.append(draggedItem)
+        draggingSource = .top
+        bottomWords.remove(at: draggedItemIndex)
+      }
+    }
+  }
 
   func dropUpdated(info: DropInfo) -> DropProposal? {
     DropProposal(operation: .move)
@@ -84,6 +193,22 @@ struct DropOutsideDelegate: DropDelegate {
 
   func performDrop(info: DropInfo) -> Bool {
     draggingItemID = nil
+    draggingSource = nil
+    return true
+  }
+}
+
+struct BackgroundDropDelegate: DropDelegate {
+  @Binding var draggingItemID: UUID?
+  @Binding var draggingSource: DraggingSource?
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    DropProposal(operation: .move)
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    draggingItemID = nil
+    draggingSource = .none
     return true
   }
 }
