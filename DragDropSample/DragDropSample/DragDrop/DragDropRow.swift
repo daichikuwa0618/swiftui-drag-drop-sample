@@ -35,27 +35,29 @@ struct DragDropRow: View {
 
         AnyLayout(FlowLayout()) {
           ForEach(topWords) { word in
-            DragDropButton(title: word.title)
-              .opacity(draggingItemID == word.id ? 0.3 : 1)
-              .onDrag {
-                draggingSource = .top
-                return NSItemProvider(object: word.id.uuidString as NSString)
-              } preview: {
-                DragDropButton(title: word.title)
-                  .onAppear {
-                    draggingItemID = word.id
-                  }
-              }
-              .onDrop(
-                of: [.text],
-                delegate: TopFlowDropDelegate(
-                  word: word,
-                  topWords: $topWords,
-                  bottomWords: $bottomWords,
-                  draggingItemID: $draggingItemID,
-                  draggingSource: $draggingSource
-                )
+            DragDropButton(title: word.title) {
+              moveWordToBottom(word)
+            }
+            .opacity(draggingItemID == word.id ? 0.3 : 1)
+            .onDrag {
+              draggingSource = .top
+              return NSItemProvider(object: word.id.uuidString as NSString)
+            } preview: {
+              DragDropButton(title: word.title)
+                .onAppear {
+                  draggingItemID = word.id
+                }
+            }
+            .onDrop(
+              of: [.text],
+              delegate: TopFlowDropDelegate(
+                word: word,
+                topWords: $topWords,
+                bottomWords: $bottomWords,
+                draggingItemID: $draggingItemID,
+                draggingSource: $draggingSource
               )
+            )
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,21 +85,26 @@ struct DragDropRow: View {
         AnyLayout(FlowLayout()) {
           ForEach(bottomWords) { word in
             if topWords.contains(where: { $0.id == word.id }) {
-              DragDropButton(title: word.title)
-                .opacity(0.4)
-                .background(Color.blue.opacity(0.1))
+              DragDropButton(
+                title: word.title,
+                isDisabled: true
+              ) {
+                moveWordToTop(word)
+              }
             } else {
-              DragDropButton(title: word.title)
-                .opacity(draggingItemID == word.id ? 0.3 : 1)
-                .onDrag {
-                  draggingSource = .bottom
-                  return NSItemProvider(object: word.id.uuidString as NSString)
-                } preview: {
-                  DragDropButton(title: word.title)
-                    .onAppear {
-                      draggingItemID = word.id
-                    }
-                }
+              DragDropButton(title: word.title) {
+                moveWordToTop(word)
+              }
+              .opacity(draggingItemID == word.id ? 0.3 : 1)
+              .onDrag {
+                draggingSource = .bottom
+                return NSItemProvider(object: word.id.uuidString as NSString)
+              } preview: {
+                DragDropButton(title: word.title)
+                  .onAppear {
+                    draggingItemID = word.id
+                  }
+              }
             }
           }
         }
@@ -115,6 +122,18 @@ struct DragDropRow: View {
       draggingItemID: $draggingItemID, 
       draggingSource: $draggingSource
     ))
+  }
+  
+  private func moveWordToTop(_ word: Word) {
+    if !topWords.contains(where: { $0.id == word.id }) {
+      topWords.append(word)
+    }
+  }
+  
+  private func moveWordToBottom(_ word: Word) {
+    if let index = topWords.firstIndex(where: { $0.id == word.id }) {
+      topWords.remove(at: index)
+    }
   }
 }
 
