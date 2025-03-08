@@ -20,7 +20,8 @@ struct DragDropButton: View {
           .stroke(Color.gray.opacity(0.5), lineWidth: 2)
           .foregroundStyle(Color.gray.opacity(0.2))
       }
-      .contentShape(Rectangle())
+      .contentShape(RoundedRectangle(cornerRadius: 8))
+      .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 8))
   }
 }
 
