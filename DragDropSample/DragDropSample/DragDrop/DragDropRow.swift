@@ -33,32 +33,48 @@ struct DragDropRow: View {
           .font(.caption)
           .foregroundColor(.gray)
 
-        ForEach(topWords) { word in
-          DragDropButton(title: word.title) {
-            moveWordToBottom(word)
-          }
-          .opacity(draggingItemID == word.id ? 0.3 : 1)
-          .onDrag {
-            draggingSource = .top
-            return NSItemProvider(object: word.id.uuidString as NSString)
-          } preview: {
+        ZStack(alignment: .topLeading) {
+          // 高さを確保するための不可視の View
+          ForEach(bottomWords) { word in
             DragDropButton(title: word.title)
-              .onAppear {
-                draggingItemID = word.id
-              }
           }
-          .onDrop(
-            of: [.text],
-            delegate: TopFlowDropDelegate(
-              word: word,
-              topWords: $topWords,
-              bottomWords: $bottomWords,
-              draggingItemID: $draggingItemID,
-              draggingSource: $draggingSource
+          .withUnderlines()
+          .opacity(0)
+
+          if topWords.isEmpty {
+            // 最初の 1 行だけ下線を表示するための View
+            DragDropButton(title: "あ")
+              .opacity(0)
+              .withUnderlines()
+          }
+
+          ForEach(topWords) { word in
+            DragDropButton(title: word.title) {
+              moveWordToBottom(word)
+            }
+            .opacity(draggingItemID == word.id ? 0.3 : 1)
+            .onDrag {
+              draggingSource = .top
+              return NSItemProvider(object: word.id.uuidString as NSString)
+            } preview: {
+              DragDropButton(title: word.title)
+                .onAppear {
+                  draggingItemID = word.id
+                }
+            }
+            .onDrop(
+              of: [.text],
+              delegate: TopFlowDropDelegate(
+                word: word,
+                topWords: $topWords,
+                bottomWords: $bottomWords,
+                draggingItemID: $draggingItemID,
+                draggingSource: $draggingSource
+              )
             )
-          )
+          }
+          .withUnderlines()
         }
-        .withUnderlines()
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background {
@@ -105,7 +121,7 @@ struct DragDropRow: View {
             }
           }
         }
-        .withUnderlines()
+        .withUnderlines(color: Color.clear)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color.gray.opacity(0.1))
